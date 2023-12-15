@@ -4,13 +4,14 @@ from config import config
 def train():
     """Initialization"""
     from torch.utils.tensorboard import SummaryWriter
+
     writer = SummaryWriter(log_dir=(config["base_dir"] + "log/"))
 
     num_envs = config["num_envs"]
 
     model = Model(config)
     if config["model_dir"] != "":  # if load an existing rl model
-        model.load_rl_model(config["model_dir"])
+        model.load_model(config["model_dir"])
         print("Load model from", config["model_dir"])
 
     envs = [Env(config) for _ in range(num_envs)]
@@ -43,7 +44,9 @@ def train():
                 break
 
         # Test and plot return
-        return_ = sum([sum(r) for r in zip(*all_r_list)]) / num_envs
+        return_ = (
+            sum([sum([sum(r) for r in r_list]) for r_list in all_r_list]) / num_envs
+        )
         writer.add_scalar("rl/return", return_, num_episodes)
         print("--- return:", return_)
 
@@ -53,7 +56,7 @@ def train():
         writer.add_scalar("train/seq_num", len(seq_list), num_episodes)
 
         # Train rl model
-        loss_dict = model.learn_rl(seq_list)
+        loss_dict = model.learn(seq_list)
         for k, v in loss_dict.items():
             writer.add_scalar("rl/" + k, v, num_episodes + 1)
         seq_list.clear()
