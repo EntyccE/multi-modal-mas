@@ -1,7 +1,7 @@
 from config import config
 
 
-def train():
+def train(logger):
     """Initialization"""
     from torch.utils.tensorboard import SummaryWriter
 
@@ -20,10 +20,11 @@ def train():
 
     """Train loop"""
     for num_episodes in range(config["num_episodes"]):
+        t_start = time.time()
+        logger.info(f"Episode {num_episodes}")
         all_r_list = list()
 
-        input_d_list = [envs[idx].reset() for idx in range(num_envs)]
-
+        input_d_list = [envs[idx].reset(logger) for idx in range(num_envs)]
         # Generate RL training data
         while True:
             rl_output_list = model.inf(input_d_list)
@@ -39,6 +40,10 @@ def train():
 
             # Record some info
             all_r_list.append(r_list)
+            
+            for i in range(num_envs):
+                for k, v in info_list[i].items():
+                    logger.info(f"Env {i} {k}: {v}")
 
             if all(done_list):
                 break
@@ -48,21 +53,28 @@ def train():
             sum([sum([sum(r) for r in r_list]) for r_list in all_r_list]) / num_envs
         )
         writer.add_scalar("rl/return", return_, num_episodes)
-        print("--- return:", return_)
+        logger.info(f"--- return: {return_}")
+        
+        num_success = sum([int(t) for info in info_list for t in info["success"] ])
+        logger.info(f"--- succeeded agent num: {num_success}")
 
         # store rl data
         for env in envs:
             seq_list += env.get()
         writer.add_scalar("train/seq_num", len(seq_list), num_episodes)
+        logger.info(f"------- seq num: {len(seq_list)}")
 
         # Train rl model
         loss_dict = model.learn(seq_list)
         for k, v in loss_dict.items():
             writer.add_scalar("rl/" + k, v, num_episodes + 1)
+            logger.info(f"------- {k}: {v}")
         seq_list.clear()
 
         torch.cuda.empty_cache()
         gc.collect()
+        
+        logger.info(f"Episode {num_episodes} time: {time.time()-t_start}")
 
     writer.close()
 
@@ -73,5 +85,13 @@ if __name__ == "__main__":
     from utils.batch import *
     import torch
     import time, gc
-
-    train()
+    
+    import os
+    os.makedirs(config["base_dir"], exist_ok=True)
+    
+    import logging
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(filename=config["base_dir"]+"out.log", filemode="w", format="%(name)s - %(levelname)s - %(message)s")
+    logger.setLevel(logging.INFO)
+    
+    train(logger)

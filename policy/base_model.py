@@ -19,9 +19,9 @@ class MAPPO(nn.Module):
         super().__init__()
         self._config = config.copy()
 
-        self._state_dim = (
+        self._state_dim = int(
             config["resolution"] * config["resolution"] * 4
-            + self._config["sample_rate"] * 2
+            + self._config["sample_rate"] * self._config["step_time"] * 2
             + 1
         )
         self._action_dim = 4
