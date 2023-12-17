@@ -14,7 +14,7 @@ def train(logger):
         model.load_model(config["model_dir"])
         print("Load model from", config["model_dir"])
 
-    envs = [Env(config) for _ in range(num_envs)]
+    envs = [Env(config, logger) for _ in range(num_envs)]
 
     seq_list = list()  # store rl data
 
@@ -24,7 +24,7 @@ def train(logger):
         logger.info(f"Episode {num_episodes}")
         all_r_list = list()
 
-        input_d_list = [envs[idx].reset(logger) for idx in range(num_envs)]
+        input_d_list = [envs[idx].reset() for idx in range(num_envs)]
         # Generate RL training data
         while True:
             rl_output_list = model.inf(input_d_list)
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     
     import logging
     logger = logging.getLogger(__name__)
-    logging.basicConfig(filename=config["base_dir"]+"out.log", filemode="w", format="%(name)s - %(levelname)s - %(message)s")
+    logging.basicConfig(filename=config["base_dir"]+"out.log", filemode="w", format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     logger.setLevel(logging.INFO)
     
     train(logger)

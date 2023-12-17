@@ -3,7 +3,7 @@ import argparse
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base_dir", type=str, default="experiments/test1/")
+    parser.add_argument("--base_dir", type=str, default="experiments/debug/")
     parser.add_argument("--num_envs", type=int, default=8)
     parser.add_argument("--model_dir", type=str, default="")
     parser.add_argument("--num_episodes", type=int, default=10000)
@@ -33,7 +33,7 @@ def parse_args():
     parser.add_argument("--sample_rate", type=float, default=48000)
 
     # env args
-    parser.add_argument("--max_episode_steps", type=int, default=100)
+    parser.add_argument("--max_episode_steps", type=int, default=5)
     parser.add_argument("--sequence_length", type=int, default=50)
     parser.add_argument("--step_time", type=float, default=0.75)
     parser.add_argument("--success_distance", type=float, default=1.0)
@@ -64,3 +64,4 @@ def parse_args():
 
 
 config = parse_args()
+)

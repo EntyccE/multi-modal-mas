@@ -14,11 +14,13 @@ from scipy.io.wavfile import write
 from scipy.signal import fftconvolve
 import librosa
 
+from utils.time import time_count
+import time
 
 class MultiAudioEnv(ParallelEnv):
     metadata = {"name": "multi_audio_nav"}
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, logger):
         # deep copy config
         self._config = config.copy()
         self._num_agents = config["agents_num"]
@@ -37,6 +39,8 @@ class MultiAudioEnv(ParallelEnv):
         self._sim = self._get_sim()
 
         self._count = 0
+        
+        self._logger = logger
 
         """predefined information"""
         self._data_structure = {
@@ -140,7 +144,7 @@ class MultiAudioEnv(ParallelEnv):
 
         return sim
 
-    def _reset_audio(self, logger):
+    def _reset_audio(self):
         """
         Do the following:
             1. generate random navigable source position
@@ -153,7 +157,7 @@ class MultiAudioEnv(ParallelEnv):
             self._sim.pathfinder.get_random_navigable_point()
             for _ in range(self._num_sources)
         ]
-        logger.info(f"source_poses {self._source_poses}")
+        self._logger.info(f"source_poses {self._source_poses}")
         for agent_id in range(self._num_agents):
             for audio_sensor_id in range(self._num_sources):
                 audio_sensor = self._sim.get_agent(agent_id)._sensors[
@@ -166,16 +170,15 @@ class MultiAudioEnv(ParallelEnv):
         self._current_sample_index = 0
         # [chunked_audios.reset() for chunked_audios in self._chunked_audios]
 
-    def _reset_agent(self, logger):
+    def _reset_agent(self):
         """
         randomly reset every agent position and rotation, at least 1m away from any source
         """
         for agent_id in range(self._num_agents):
             agent = self._sim.get_agent(agent_id)
             agent_state = habitat_sim.AgentState()
-            # TODO not valid random
             agent_state.position = self._sim.pathfinder.get_random_navigable_point()
-            logger.info(f"agent_state.position {agent_state.position}")
+            self._logger.info(f"agent_state.position {agent_state.position}")
             # Generate random yaw angle from -180 to 180
             # yaw = np.random.uniform(-np.pi, np.pi)
             # q = from_euler_angles(0, yaw, 0)
@@ -186,6 +189,7 @@ class MultiAudioEnv(ParallelEnv):
 
         self._crushed_agents = [False] * self._num_agents
 
+    @time_count
     def _convolve_with_ir(self, ir):
         ir = ir.T
         sampling_rate = self._sample_rate
@@ -238,7 +242,7 @@ class MultiAudioEnv(ParallelEnv):
 
         return audiogoal
 
-    def reset(self, logger):
+    def reset(self):
         """
         reset the environment
         Return:
@@ -246,8 +250,8 @@ class MultiAudioEnv(ParallelEnv):
         """
         self._count = 0
 
-        self._reset_audio(logger)
-        self._reset_agent(logger)
+        self._reset_audio()
+        self._reset_agent()
 
         self._prev_obs = list()
 
@@ -280,6 +284,7 @@ class MultiAudioEnv(ParallelEnv):
 
         return s
 
+    @time_count
     def _get_observations(self):
         """
         get observation for each agent
@@ -287,8 +292,9 @@ class MultiAudioEnv(ParallelEnv):
             obs: list of dict, representing observation for each agent
         """
         obs_list = []
+        t = time.time()
         all_obs = self._sim.get_sensor_observations(agent_ids=range(self._num_agents))
-
+        self._logger.info(f"get_sensor_observations time: {time.time()-t}")
         for agent_id in range(self._num_agents):
             obs = all_obs[agent_id]
             # get audio chunk
@@ -372,6 +378,7 @@ class MultiAudioEnv(ParallelEnv):
 
         return all(cond)
 
+    @time_count
     def step(self, a: list[dict]):
         """
         typical step function for rl
@@ -504,7 +511,7 @@ class MultiAudioEnv(ParallelEnv):
 
         for i in range(self._num_agents):
             out = list()
-            while len(self._data[i]["camera"]) > 1:  # 1 for bootstrap
+            while len(self._data[i]["audio"]) > 1:  # 1 for bootstrap
                 seq = dict()
                 for k, v in self._data[i].items():
                     # print(k)

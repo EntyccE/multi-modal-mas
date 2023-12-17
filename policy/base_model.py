@@ -13,7 +13,7 @@ from utils.batch import stack_batch_multi, unstack_batch_multi, stack_batch
 
 INFINITY = 1e9
 
-
+from utils.time import time_count
 class MAPPO(nn.Module):
     def __init__(self, config: Dict):
         super().__init__()
@@ -65,6 +65,7 @@ class MAPPO(nn.Module):
         nn.init.constant_(self._lstm.bias_ih_l0, 0.0)
         nn.init.constant_(self._lstm.bias_hh_l0, 0.0)
 
+    @time_count
     def forward(self, input_d):
         """Build model that is capable to do forward process"""
         output_d = dict()
@@ -79,7 +80,8 @@ class MAPPO(nn.Module):
         ct = input_d["lstm_c"][:, 0, :].reshape(1, N, -1).detach().contiguous()
 
         s = torch.cat((input_d["camera"], input_d["audio"], input_d["step"]), dim=-1)
-
+        # s = torch.cat((input_d["audio"], input_d["step"]), dim=-1)
+        
         s = F.relu(self._net1(s))
         lstm_out, (hn, cn) = self._lstm(s, (ht, ct))
         pi_logits = self._pi_net_fc2(F.relu(self._pi_net_fc1(lstm_out)))
@@ -188,6 +190,7 @@ class MAPPO(nn.Module):
             gae_value[:, t] = value[:, t] + gae_advantage[:, t]
         return gae_advantage[:, :-1].detach(), gae_value.detach()
 
+    @time_count
     def learn(self, input_d: Dict):
         """
         Train the model with data
